@@ -8,15 +8,15 @@ from setuptools import setup
 
 setup(
     name = "freshen",
-    version = "0.2",
+    version = "0.3dexterous1",
     description = "Clone of the Cucumber BDD framework for Python",
     author = "Roman Lisagor",
     author_email = "rlisagor+freshen@gmail.com",
     url = "http://github.com/rlisagor/freshen",
     license = "GPL",
-    packages = ["freshen"],
+    packages = ["freshen", "freshen.test"],
     package_data = {'freshen': ['languages.yml']},
-    install_requires = ['pyparsing>=1.5.0', 'PyYAML', 'nose>=0.11.1'],
+    install_requires = ['pyparsing>=1.5.0', 'PyYAML', 'nose>=1.0.0'],
     entry_points = {
         'nose.plugins.0.10': [
             'freshen = freshen.noseplugin:FreshenNosePlugin',
