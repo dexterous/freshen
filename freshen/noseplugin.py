@@ -105,7 +105,7 @@ class FreshenNosePlugin(Plugin):
             self.undefined_steps = []
         else:
             self.undefined_steps = None
-        self._test_class = None
+        self.__test_class = None
 
     def wantDirectory(self, dirname):
         if not os.path.exists(os.path.join(dirname, ".freshenignore")):
@@ -115,7 +115,7 @@ class FreshenNosePlugin(Plugin):
     def wantFile(self, filename):
         return filename.endswith(".feature") or None
 
-    def _makeTestClass(self, feature, scenario):
+    def __makeTestClass(self, feature, scenario):
         """Chooses the test base class appropriate
         for the given feature.
         
@@ -133,14 +133,14 @@ class FreshenNosePlugin(Plugin):
         In the future this can be extended to support
         more flexible (e.g. user-defined) test classes
         on a per-feature basis."""
-        if self._test_class is None:
+        if self.__test_class is None:
             try:
                 from freshen.test.async import TwistedTestCase
-                self._test_class = TwistedTestCase
+                self.__test_class = TwistedTestCase
             except ImportError:
                 from freshen.test.pyunit import PyunitTestCase
-                self._test_class = PyunitTestCase
-        return type(feature.name, (self._test_class, ), {scenario.name: lambda self: self.runScenario()})
+                self.__test_class = PyunitTestCase
+        return type(feature.name, (self.__test_class, ), {scenario.name: lambda self: self.runScenario()})
 
     def loadTestsFromFile(self, filename, indexes=[]):
         log.debug("Loading from file %s" % filename)
@@ -165,7 +165,7 @@ class FreshenNosePlugin(Plugin):
         for i, sc in enumerate(feat.iter_scenarios()):
             if (not indexes or (i + 1) in indexes):
                 if self.tagmatcher.check_match(sc.tags + feat.tags):
-                    test_class = self._makeTestClass(feat, sc)
+                    test_class = self.__makeTestClass(feat, sc)
                     yield test_class(StepsRunner(step_registry), step_registry, feat, sc, ctx)
                     cnt += 1
 
@@ -175,10 +175,10 @@ class FreshenNosePlugin(Plugin):
     def loadTestsFromName(self, name, _=None):
         log.debug("Loading from name %s" % name)
 
-        if not self._is_file_with_indexes(name):
+        if not self.__is_file_with_indexes(name):
             return # let nose take care of it
 
-        name_without_indexes, indexes = self._split_file_in_indexes(name)
+        name_without_indexes, indexes = self.__split_file_in_indexes(name)
         if not os.path.exists(name_without_indexes):
             return
 
@@ -186,21 +186,6 @@ class FreshenNosePlugin(Plugin):
            and name_without_indexes.endswith(".feature"):
             for tc in self.loadTestsFromFile(name_without_indexes, indexes):
                 yield tc
-
-    def _is_file_with_indexes(self, name):
-        drive, tail = os.path.splitdrive(name)
-        if ":" not in tail:
-            return False
-        else:
-            return True
-
-    def _split_file_in_indexes(self, name_with_indexes):
-        drive, tail = os.path.splitdrive(name_with_indexes)
-        parts = tail.split(":")
-        name_without_indexes = drive + parts.pop(0)
-        indexes = []
-        indexes = set(int(p) for p in parts)
-        return (name_without_indexes, indexes)
 
     def describeTest(self, test):
         if isinstance(test.test, FreshenTestCase):
@@ -211,10 +196,10 @@ class FreshenNosePlugin(Plugin):
             ec, ev, tb = err
             if ec is ExceptionWrapper and isinstance(ev, Exception):
                 orig_ec, orig_ev, orig_tb = ev.e
-                message = "%s\n\n%s" % (str(orig_ev), self._formatSteps(test, ev.step))
+                message = "%s\n\n%s" % (str(orig_ev), self.__formatSteps(test, ev.step))
                 return (orig_ec, message, orig_tb)
             elif not ec is UndefinedStepImpl and hasattr(test.test, 'last_step'):
-                message = "%s\n\n%s" % (str(ev), self._formatSteps(test, test.test.last_step))
+                message = "%s\n\n%s" % (str(ev), self.__formatSteps(test, test.test.last_step))
                 return (ec, message, tb)
 
     formatError = formatFailure
@@ -224,13 +209,13 @@ class FreshenNosePlugin(Plugin):
         # UndefinedStepImpl exceptions for reporting later.
         if self.undefined_steps is not None:
             plugin = self
-            def _addError(self, test, err):
+            def __addError(self, test, err):
                 ec, ev, tb = err
                 if isclass(ec) and issubclass(ec, UndefinedStepImpl):
                     plugin.undefined_steps.append((test, ec, ev, tb))
-                self._old_addError(test, err)
-            result._old_addError = result.addError
-            result.addError = instancemethod(_addError, result, result.__class__)
+                self.__old_addError(test, err)
+            result.__old_addError = result.addError
+            result.addError = instancemethod(__addError, result, result.__class__)
 
     def report(self, stream):
         if self.undefined_steps:
@@ -238,7 +223,7 @@ class FreshenNosePlugin(Plugin):
             stream.write("Tests with undefined steps\n")
             stream.write("----------------------------------------------------------------------\n")
             for test, ec, ev, tb in self.undefined_steps:
-                stream.write(self._formatSteps(test, ev.step, False) + "\n\n")
+                stream.write(self.__formatSteps(test, ev.step, False) + "\n\n")
             stream.write("You can implement step definitions for the missing steps with these snippets:\n\n")
             uniq_steps = set(s[2].step for s in self.undefined_steps)
             for step in uniq_steps:
@@ -248,7 +233,22 @@ class FreshenNosePlugin(Plugin):
                                                  re.sub('[^\w]', '_', step.match).lower()))
                 stream.write('    # code here\n\n')
 
-    def _formatSteps(self, test, failed_step, failure=True):
+    def __is_file_with_indexes(self, name):
+        drive, tail = os.path.splitdrive(name)
+        if ":" not in tail:
+            return False
+        else:
+            return True
+
+    def __split_file_in_indexes(self, name_with_indexes):
+        drive, tail = os.path.splitdrive(name_with_indexes)
+        parts = tail.split(":")
+        name_without_indexes = drive + parts.pop(0)
+        indexes = []
+        indexes = set(int(p) for p in parts)
+        return (name_without_indexes, indexes)
+
+    def __formatSteps(self, test, failed_step, failure=True):
         ret = []
         ret.append(FreshenPrettyPrint.feature(test.test.feature))
         ret.append(FreshenPrettyPrint.scenario(test.test.scenario))
